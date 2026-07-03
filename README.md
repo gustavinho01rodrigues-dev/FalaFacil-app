@@ -1,114 +1,46 @@
-# Fala Aí — pratique pronúncia de inglês e espanhol
+# Tutor de IA de Inglês — Setup
 
-App para praticar pronúncia: o tutor fala a frase em voz alta (voz nativa do
-navegador), você grava sua própria pronúncia, ouve a comparação e recebe uma
-nota automática de acerto.
+## 1. Pegue a chave gratuita do Gemini
+- Acesse https://aistudio.google.com/apikey
+- Crie uma API key (sem cartão de crédito)
 
-## Como funciona a "voz falada de verdade"
-
-Usa a **Web Speech API** do próprio navegador (`speechSynthesis`), que é
-grátis e não precisa de nenhuma chave de API. A qualidade da voz depende do
-navegador/sistema operacional (Chrome no Windows/Android costuma ter vozes
-bem naturais em inglês e espanhol). Não é a mesma tecnologia dos apps tipo
-Duolingo/ELSA (que usam TTS pago de altíssima qualidade), mas é uma alternativa
-gratuita e funcional para validar a ideia.
-
-A nota de pronúncia usa **SpeechRecognition** (reconhecimento de fala do
-navegador) para transcrever o que você falou e comparar com o texto esperado.
-Funciona bem no **Chrome e Edge**. No Safari e Firefox, o reconhecimento pode
-não funcionar — nesse caso o app ainda permite gravar e ouvir sua voz, só não
-calcula a nota automática.
-
----
-
-## Passo 1 — Criar o projeto no Supabase
-
-1. Acesse [supabase.com](https://supabase.com) e crie uma conta/projeto novo.
-2. Vá em **SQL Editor** → cole todo o conteúdo do arquivo
-   `supabase/schema.sql` deste projeto → clique em **Run**.
-   Isso cria as tabelas `frases` e `progresso_usuario`, ativa a segurança
-   (RLS) e já insere as 50 frases de teste.
-3. Vá em **Project Settings → API**. Copie:
-   - `Project URL`
-   - `anon public key`
-4. (Opcional, recomendado para testes) Em **Authentication → Providers →
-   Email**, desative "Confirm email" para não precisar confirmar e-mail a
-   cada cadastro de teste.
-
-## Passo 2 — Configurar o projeto localmente
-
-```bash
-# dentro da pasta do projeto
-cp .env.local.example .env.local
+## 2. Variáveis de ambiente (Vercel + `.env.local`)
+```
+GEMINI_API_KEY=sua_chave_aqui
+NEXT_PUBLIC_SUPABASE_URL=sua_url_supabase
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sua_chave_anon
 ```
 
-Edite `.env.local` e cole a URL e a chave anon copiadas do Supabase:
+## 3. Banco de dados
+Rode o arquivo `supabase-schema.sql` no SQL Editor do Supabase.
 
+## 4. Arquivos do projeto
+- `route.ts` → mova para `app/api/tutor/route.ts`
+- `TutorChat.tsx` → mova para `components/TutorChat.tsx`
+
+## 5. Como usar o componente
+```tsx
+// em alguma page.tsx, ex: app/tutor/page.tsx
+import TutorChat from "@/components/TutorChat";
+
+export default function TutorPage() {
+  const conversationId = "crie-ou-busque-uma-conversation-id-do-supabase";
+  return <TutorChat conversationId={conversationId} />;
+}
 ```
-NEXT_PUBLIC_SUPABASE_URL=https://SEU-PROJETO.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=sua-chave-aqui
+Você vai precisar criar uma `conversation` no Supabase antes (insert na tabela `conversations`) e passar o `id` gerado para o componente — isso é o que agrupa as mensagens de cada sessão de estudo.
+
+## 6. Dependência
 ```
-
-Instale as dependências e rode local:
-
-```bash
-npm install
-npm run dev
-```
-
-Abra `http://localhost:3000`, crie uma conta e teste.
-
-## Passo 3 — Subir para o GitHub
-
-```bash
-git init
-git add .
-git commit -m "primeira versão do app"
-git branch -M main
-git remote add origin https://github.com/SEU-USUARIO/SEU-REPO.git
-git push -u origin main
+npm install @supabase/supabase-js
 ```
 
-⚠️ O arquivo `.env.local` **não** vai junto (está no `.gitignore`) — isso é
-proposital, suas chaves não devem ir pro GitHub.
+## Como funciona
+- O aluno digita ou fala (botão 🎤, usando reconhecimento de voz nativo do navegador)
+- A mensagem vai pro `/api/tutor`, que chama o Gemini com um prompt que instrui a IA a: conversar naturalmente + detectar erros + retornar correção estruturada em JSON
+- Se houve erro, aparece um card mostrando o texto errado, a correção e uma explicação em português
+- A resposta do tutor também é falada em voz alta (`speechSynthesis`, também nativo e grátis)
+- Tudo fica salvo no Supabase para você depois montar um dashboard de progresso (ex: erros mais comuns)
 
-## Passo 4 — Publicar na Vercel
-
-1. Acesse [vercel.com](https://vercel.com) → **Add New Project** → importe o
-   repositório do GitHub que você acabou de criar.
-2. Em **Environment Variables**, adicione as duas mesmas variáveis do
-   `.env.local`:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-3. Clique em **Deploy**. Pronto — a cada `git push` na branch `main`, a
-   Vercel publica automaticamente a nova versão.
-
----
-
-## Estrutura do projeto
-
-```
-app/
-  page.js            → landing page
-  login/page.js       → tela de login
-  signup/page.js       → tela de cadastro
-  dashboard/page.js    → lista de frases (protegida por login)
-components/
-  PhraseCard.jsx        → fala do tutor, gravação, nota de pronúncia
-  Navbar.jsx
-lib/
-  supabaseClient.js     → conexão com Supabase
-  useAuth.js             → hook de sessão do usuário
-  similarity.js           → cálculo da nota de pronúncia
-supabase/
-  schema.sql               → tabelas + 50 frases de teste (25 EN + 25 ES)
-```
-
-## Próximos passos sugeridos
-
-- Trocar a voz do navegador por uma API de TTS paga (ElevenLabs, Google
-  Cloud TTS ou Azure) quando quiser qualidade de voz mais natural.
-- Adicionar mais frases/categorias na tabela `frases` via Supabase Table
-  Editor (não precisa mexer em código).
-- Guardar o áudio gravado no Supabase Storage, se quiser ouvir tentativas
-  antigas.
+## Limites do free tier do Gemini (modelo `gemini-2.5-flash`)
+Generoso o suficiente para uso pessoal/MVP, mas se seu site crescer, vale monitorar no Google AI Studio e considerar ativar billing.
